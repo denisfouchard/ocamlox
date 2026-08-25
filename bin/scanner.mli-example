@@ -1,0 +1,24 @@
+
+module Scanner : sig
+  type token_type
+
+  type literal_type
+
+  type token
+
+  type scanner_context
+
+  val scan_tokens: string -> token list
+  val scan_token: scanner_context -> scanner_context
+
+  val add_token: token_type -> string -> literal_type option -> int -> scanner_context -> scanner_context
+
+  val incr_ctx: scanner_context -> scanner_context
+
+  val current_char: scanner_context -> char option
+
+  val is_at_end: scanner_context -> bool
+  val add_literal_token: token_type -> literal_type option -> scanner_context -> scanner_context
+
+  val add_non_literal_token: token_type -> scanner_context -> scanner_context
+end

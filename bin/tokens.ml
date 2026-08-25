@@ -45,6 +45,7 @@ type tokenType =
   | VAR
   | WHILE
   | EOF
+  | BOF
 ;;
 
 type literal_type = STRING_LITERAL of string | NUMBER_LITERAL of float;;
@@ -105,7 +106,6 @@ let rec skip_line ctx =
 
 let scan_string (ctx:scanner_ctx) =
   let rec scan_string_acc ctx acc =
-    print_endline ("Current[string]: " ^ (string_of_int ctx.current));
     let c = current_char ctx in
     match c with
     | None | Some '\n'-> failwith "Incorrect formated string. Expected end of string"
@@ -120,7 +120,6 @@ let scan_string (ctx:scanner_ctx) =
 
 let scan_token (ctx:scanner_ctx) =
   let rec scan_second_token acc ctx =
-    print_endline ("Current: " ^ (string_of_int ctx.current));
     let ctx_= advance ctx in
       match current_char ctx_ with
         | None -> add_token EOF None ctx_
@@ -140,25 +139,29 @@ let scan_token (ctx:scanner_ctx) =
             |';'-> add_token SEMICOLON None ctx_
             |'*'-> add_token STAR None ctx_
             (* Double char operators *)
-            |'!'-> if is_next '=' ctx_ then scan_second_token BANG ctx_ else add_token BANG None ctx_
-            |'>' -> if is_next '=' ctx_ then scan_second_token GREATER ctx_ else add_token GREATER None ctx_
-            |'<' -> if is_next '=' ctx_ then scan_second_token LESS ctx_ else add_token LESS None ctx_
+            |'!'-> if is_next '=' ctx_
+                    then scan_second_token BANG ctx_
+                    else add_token BANG None ctx_
+            |'>' -> if is_next '=' ctx_
+                      then scan_second_token GREATER ctx_
+                      else add_token GREATER None ctx_
+            |'<' ->  if is_next '=' ctx_
+                      then scan_second_token LESS ctx_
+                      else add_token LESS None ctx_
             |'=' -> (match acc with
-                    | BANG -> add_token BANG_EQUAL None ctx_
-                    | GREATER -> add_token GREATER_EQUAL None ctx_
-                    | LESS -> add_token LESS_EQUAL None ctx_
-                    | EOF -> add_token EQUAL None ctx_
-                    |_ -> add_token EQUAL None (add_token acc None ctx_))
+                      | BANG -> add_token BANG_EQUAL None ctx_
+                      | GREATER -> add_token GREATER_EQUAL None ctx_
+                      | LESS -> add_token LESS_EQUAL None ctx_
+                      | BOF -> add_token EQUAL None ctx_
+                      |_ -> add_token EQUAL None (add_token acc None ctx_))
             (* Case of // for comment *)
             |'/' -> (match acc with
-                    (*Comment*)
-                    | SLASH -> skip_line ctx_
-                    |_ -> scan_second_token SLASH ctx_
-
-            )
+                      (*Comment*)
+                      | SLASH -> skip_line ctx_
+                      |_ -> scan_second_token SLASH ctx_)
             |'"' -> scan_string (advance ctx_)
             | _ -> failwith ("Unknown character " ^ (String.make 1 c) ^ " at line " ^ string_of_int ctx_.line)
-    in scan_second_token EOF ctx;;
+    in scan_second_token BOF ctx;;
 
 
 

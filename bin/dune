@@ -8,4 +8,3 @@
 (executable
   (name tokens)
   (libraries ocamlox))
-   (modules_without_implementation scanner)
