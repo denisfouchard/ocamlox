@@ -1,3 +1,8 @@
-(test
- (name test_ocamlox)
+(executable
+ (name test_scanning)
  (libraries ocamlox))
+
+(rule
+ (alias runtest)
+ (action (run ./test_scanning.exe)))
+
