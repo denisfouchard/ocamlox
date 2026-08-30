@@ -19,7 +19,7 @@
  (name ocamlox)
  (synopsis "A short synopsis")
  (description "A longer description")
- (depends ocaml)
+ (depends ocaml orderbook lwt sexplib ppx_show)
  (tags
   ("add topics" "to describe" your project)))
 

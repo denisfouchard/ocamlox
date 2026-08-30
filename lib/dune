@@ -1,2 +1,4 @@
 (library
- (name ocamlox))
+ (name ocamlox)
+ (libraries yojson)
+ (preprocess (pps ppx_deriving.show ppx_deriving.eq ppx_deriving_yojson)))

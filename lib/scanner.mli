@@ -39,17 +39,17 @@ type tokenType =
   | WHILE
   | EOF
   | BOF
-
+  [@@deriving show]
 type literal_type =
   | STRING_LITERAL of string
   | NUMBER_LITERAL of float
-
+  [@@deriving show]
 type token = {
   token_type : tokenType;
   lexeme : string;
   literal : literal_type option;
   line : int;
-}
+}[@@deriving show]
 
 type scanner_ctx = {
   source : string;

@@ -44,6 +44,7 @@ type tokenType =
   | WHILE
   | EOF
   | BOF
+  [@@deriving show]
 
 module Keywords = struct
 
@@ -76,12 +77,14 @@ module Keywords = struct
 end
 
 type literal_type = STRING_LITERAL of string | NUMBER_LITERAL of float
+[@@deriving show]
+
 type token = {
   token_type:tokenType;
     lexeme:string;
     literal:literal_type option;
     line:int
-}
+}[@@deriving show]
 
 type scanner_ctx = {
   source: string; start:int; current:int; line:int; tokens: token list
@@ -150,7 +153,7 @@ let is_alphanumeric (ch:char) = is_alpha ch || parse_int ch >= 0
 
 let is_next c ctx = match (current_char (advance ctx)) with
   | None -> false
-| Some x -> c == x
+  | Some x -> c == x
 
 let rec skip_line ctx =
   match current_char ctx with
@@ -217,6 +220,19 @@ let scan_numerical (ctx:scanner_ctx) =
     in (add_token NUMBER literal_token (rollback ctx_))
 
 
+let get_next_token ctx =
+  match (current_char (advance ctx)) with
+    | None -> "NONE"
+    | Some x -> String.make 1 x
+
+let get_acc token =
+  match token with
+  | BANG ->  "BANG"
+  | GREATER -> "GREATER"
+  | LESS ->  "LESS"
+  | BOF -> "BOF"
+  | EQUAL -> "EQUAL"
+  |_ -> "OTHER"
 
 let scan_token (ctx:scanner_ctx) =
   let rec scan_second_token acc ctx =
@@ -234,8 +250,8 @@ let scan_token (ctx:scanner_ctx) =
             |'}'-> add_token RIGHT_BRACE None ctx_
             |','-> add_token COMMA None ctx_
             |'.'-> add_token DOT None ctx_
-            |'-'-> add_token MINUS None ctx_
             |'+'-> add_token PLUS None ctx_
+            |'-'-> add_token MINUS None ctx_
             |';'-> add_token SEMICOLON None ctx_
             |'*'-> add_token STAR None ctx_
             (* Double char operators *)
@@ -248,16 +264,19 @@ let scan_token (ctx:scanner_ctx) =
             |'<' ->  if is_next '=' ctx_
                       then scan_second_token LESS ctx_
                       else add_token LESS None ctx_
-            |'=' -> (match acc with
+            |'=' -> if is_next '=' ctx_ then scan_second_token EQUAL ctx_ else
+                (match acc with
                       | BANG -> add_token BANG_EQUAL None ctx_
                       | GREATER -> add_token GREATER_EQUAL None ctx_
                       | LESS -> add_token LESS_EQUAL None ctx_
                       | BOF -> add_token EQUAL None ctx_
-                      |_ -> add_token EQUAL None (add_token acc None ctx_))
+                      | EQUAL -> add_token EQUAL_EQUAL None ctx_
+                      | _ when is_next '=' ctx_ -> scan_second_token EQUAL ctx_
+                      | _ -> add_token EQUAL None (add_token acc None ctx_))
             (* Case of // for comment *)
             |'/' -> (match acc with
                       (*Comment*)
-                      | SLASH -> (print_endline "Skip line"; skip_line ctx_)
+                      | SLASH -> (skip_line ctx_)
                       |_ -> scan_second_token SLASH ctx_)
             |'"' -> scan_string (advance ctx_)
             | _ when parse_int c >= 0 -> scan_numerical  ctx_

@@ -1,4 +1,5 @@
 open Scanner
+open Parser
 
 let string_of_token_type = function
   | LEFT_PAREN -> "LEFT_PAREN"
@@ -52,3 +53,31 @@ let print_token tok =
   Printf.printf "  [type: %-13s | lexeme: %-6S | literal: %s | line: %d]\n"
     (string_of_token_type tok.token_type)
     tok.lexeme lit_str tok.line
+
+
+let rec print_ast (t:ast) =
+  match t with
+
+  (*Binary operators*)
+  | IS_EQAL (t1, t2)-> Printf.sprintf "IS_EQ(%S, %S)" (print_ast t1) (print_ast t2)
+  | IS_NEQ (t1, t2)-> Printf.sprintf "IS_NEQ(%S, %S)" (print_ast t1) (print_ast t2)
+  | LT (t1, t2)-> Printf.sprintf "LT(%S, %S)" (print_ast t1) (print_ast t2)
+  | LEQ (t1, t2)-> Printf.sprintf "LEQ(%S, %S)" (print_ast t1) (print_ast t2)
+  | GT (t1, t2)-> Printf.sprintf "GT(%S, %S)" (print_ast t1) (print_ast t2)
+  | GEQ (t1, t2)-> Printf.sprintf "GEQ(%S, %S)" (print_ast t1) (print_ast t2)
+  | ADD (t1, t2)-> Printf.sprintf "ADD(%S, %S)" (print_ast t1) (print_ast t2)
+  | SUB (t1, t2)-> Printf.sprintf "SUB(%S, %S)" (print_ast t1) (print_ast t2)
+  | MULT (t1, t2)-> Printf.sprintf "MULT(%S, %S)" (print_ast t1) (print_ast t2)
+  | DIV (t1, t2)-> Printf.sprintf "DIV(%S, %S)" (print_ast t1) (print_ast t2)
+
+  (*Unary operators*)
+  |NOT t1 -> Printf.sprintf "Not(%S)" (print_ast t1)
+  |NEG t1 -> Printf.sprintf "Minus(%S)" (print_ast t1)
+
+ (*Literals*)
+ | EMPTY -> "EMPTY"
+ | NUMBER_VALUE v -> Printf.sprintf "Number(%f)" v
+ | STRING_VALUE s -> Printf.sprintf "String(%S)" s
+ | BOOL_TRUE -> "True"
+ | BOOL_FALSE -> "False"
+ | NIL_VALUE -> "Nil"

@@ -2,6 +2,7 @@ open Arg
 open Format
 open Ocamlox.Scanner
 open Ocamlox.Utils
+open Ocamlox.Parser
 let usage_msg = "ocamlox [<file>] [--expression <expr>]"
 
 
@@ -15,14 +16,22 @@ let read_whole_file filename =
   let ch = open_in_bin filename in
   let s = really_input_string ch (in_channel_length ch) in
   close_in ch;
-  print_endline s;
   s
 
+
+let run_source_2 (source : string) =
+  let ctx = init_scanner source in
+  let result = scan_source ctx in
+  List.rev result.tokens |> List.iter print_token
 
 let run_source (source : string) =
   let ctx = init_scanner source in
   let result = scan_source ctx in
-  List.rev result.tokens |> List.iter print_token
+  let token_list = List.rev result.tokens in
+    token_list |> List.iter print_token;
+    let t = parse_expression token_list in
+    let s = print_ast t in
+    print_endline s
 
 
 let launch_repl () =
