@@ -1,0 +1,5 @@
+//print (1+2) + 3 / (5-4)
+print "1. Hello World";
+print "2. Hello World";
+print false;
+print true;
