@@ -3,11 +3,38 @@ open Parser
 type type_t = | Boolean_t of bool | Float_t of float | String_t of string [@@deriving show]
 type 'a result = | EvaluationError of string  | Value of type_t | NoneValue
 
+
+
+let new_env () = Hashtbl.create 1000
+
+
+
+let define env name value =
+ Hashtbl.add env name value
+
+
+let get_var env name =
+  let res = Hashtbl.find_opt env name in
+  match res with
+  | None -> EvaluationError ("Unbound variable: " ^name ^" does not exist.")
+  | Some v -> v
+
+
 let print_result res =
   match res with
   |EvaluationError msg -> print_endline msg
 | Value x -> print_endline (show_type_t x)
 | NoneValue -> print_endline "NoneValue"
+
+let to_str (a:'a result) =
+  match a with
+  |NoneValue -> "None"
+  |Value aa ->(
+    match aa with
+    |String_t s -> "\"" ^s ^"\""
+    |Boolean_t b -> if b then "True" else "False"
+    |Float_t x -> string_of_float x)
+| EvaluationError s -> s
 
 let fn_not (b: type_t) =
   match b with
@@ -78,33 +105,28 @@ let fn_leq (a:type_t) (b:type_t)  =
   |_ -> EvaluationError "missmatch types"
 
 let fn_print (a:type_t) =
-  let to_str (a:type_t) =
-    match a with
-    |String_t s -> s
-    |Boolean_t b -> if b then "True" else "False"
-    |Float_t x -> string_of_float x
-  in
-  print_endline (to_str a); NoneValue
+  print_endline (to_str (Value a)); NoneValue
 
 
-let rec eval (t:ast) =
+let eval (t:ast) =
+let rec eval_env (t:ast) env =
   match t with
   | EMPTY -> NoneValue
   (*Binary operators*)
-  | IS_EQAL (expr_left, expr_right) -> binary_operator expr_left expr_right fn_eq
-  | IS_NEQ (expr_left, expr_right) -> binary_operator expr_left expr_right fn_neq
-  | LT (expr_left, expr_right) -> binary_operator expr_left expr_right fn_lt
-  | LEQ (expr_left, expr_right) -> binary_operator expr_left expr_right fn_leq
-  | GT (expr_left, expr_right) -> binary_operator expr_left expr_right fn_gt
-  | GEQ (expr_left, expr_right) -> binary_operator expr_left expr_right fn_geq
-  | ADD (expr_left, expr_right) -> binary_operator expr_left expr_right fn_add
-  | SUB (expr_left, expr_right) -> binary_operator expr_left expr_right fn_sub
-  | MULT (expr_left, expr_right) -> binary_operator expr_left expr_right fn_mult
-  | DIV (expr_left, expr_right) -> binary_operator expr_left expr_right fn_div
+  | IS_EQAL (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_eq
+  | IS_NEQ (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_neq
+  | LT (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_lt
+  | LEQ (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_leq
+  | GT (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_gt
+  | GEQ (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_geq
+  | ADD (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_add
+  | SUB (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_sub
+  | MULT (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_mult
+  | DIV (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_div
 
   (*Unary operators*)
-  |NOT (expr) -> unary_operator expr fn_not
-  |NEG (expr) -> unary_operator expr fn_neg
+  |NOT (expr) -> unary_operator env expr fn_not
+  |NEG (expr) -> unary_operator env expr fn_neg
 
  (*Literals*)
  | NUMBER_VALUE x -> Value (Float_t x)
@@ -114,28 +136,42 @@ let rec eval (t:ast) =
  | NIL_VALUE -> NoneValue
 
 (*Statements*)
- | ExpressionStatement expr -> NoneValue
- | PrintStatement expr -> unary_operator expr fn_print
+ | ExpressionStatement expr -> let v = eval_env expr env  in print_result v; v
+ | PrintStatement expr -> unary_operator env expr fn_print
  | StatementSequence l ->
    (match l with
    |[] -> NoneValue
-   |expr::q -> let _ = eval expr in  eval (StatementSequence q))
- |_ -> EvaluationError ("Not implemented : " ^ show_ast t)
+   |expr::q -> let _ = eval_env expr env in  eval_env (StatementSequence q)env)
 
-and binary_operator left_t right_t op_fn =
-  let left_v = eval left_t in
+(*Variable*)
+| VariableDeclaration ({name=n;value=var_t}) -> var_decl_operator env n var_t
+| VariableAccess s -> get_var env s
+
+|_ -> EvaluationError ("Not implemented : " ^ show_ast t)
+
+
+and binary_operator env left_t right_t op_fn =
+  let left_v = eval_env left_t env  in
   match left_v with
   |EvaluationError msg -> EvaluationError msg
   |NoneValue -> EvaluationError "expected value, got none"
-  |Value left_vv -> let right_v = eval right_t in
+  |Value left_vv -> let right_v = eval_env right_t env in
     (match right_v with
     |EvaluationError msg -> EvaluationError msg
     |NoneValue -> EvaluationError "expected value, got none"
     |Value right_vv -> op_fn left_vv right_vv)
 
-and unary_operator t op_fn =
-  let v = eval t in
+and unary_operator env t op_fn =
+  let v = eval_env t env in
   match v with
   | EvaluationError msg -> EvaluationError msg
   |NoneValue -> EvaluationError "expected value, got none"
   | Value vv -> op_fn vv
+
+and var_decl_operator env (name:string) (t:ast) =
+  let v = eval_env t env in
+  match v with
+  | EvaluationError msg -> EvaluationError msg
+  | _-> print_endline ("Var(" ^ name ^ ") = " ^ (to_str v)); (define env name v); NoneValue
+
+in eval_env t (new_env ())

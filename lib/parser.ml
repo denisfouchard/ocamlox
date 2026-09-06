@@ -67,7 +67,8 @@ type ast =
  |ExpressionStatement of ast
  |PrintStatement of ast
 
- |VariableDeclaration of ast
+ |VariableDeclaration of {name:string; value:ast}
+ |VariableAccess of string
  [@@deriving show]
 
 let is_primary (token:token) =
@@ -178,8 +179,13 @@ and parse_primary tokens =
   | { token_type = FALSE; _ } :: next -> BOOL_FALSE, next
   | { token_type = STRING; literal = Some (STRING_LITERAL v); _ } :: next -> STRING_VALUE v, next
   | { token_type = NUMBER; literal = Some (NUMBER_LITERAL v); _ } :: next -> NUMBER_VALUE v, next
+  (* variable access*)
+  | token:: next when token.token_type == IDENTIFIER -> parse_var token, next
   | token :: _ -> failwith ("[ParsingError]Invalid token: " ^ show_tokenType token.token_type)
-
+and parse_var token =
+  match token.literal with
+  | Some (STRING_LITERAL name) -> VariableAccess name
+  | _-> failwith("[ParsingError] Unbound variable")
 
 let rec parse_semicol tokens acc=
   match tokens with
@@ -211,7 +217,13 @@ and parse_declaration tokens =
   | _ ->  let expr, _ = parse_expression tokens in
     (ExpressionStatement expr)
 
-and parse_variable_declaration expr = EMPTY
+and parse_variable_declaration expr =
+  match expr with
+  |identifier::{token_type = EQUAL; _}::decl_expr
+    when identifier.token_type == IDENTIFIER ->
+    let decl_t,_  = parse_expression decl_expr in
+    VariableDeclaration ({name=identifier.lexeme;value=decl_t})
+  |_-> failwith("[VariableDeclarationError] Wrong variable declaration")
 
 let parse tokens =
   let ast, remaining = parse_expression tokens in
