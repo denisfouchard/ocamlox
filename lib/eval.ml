@@ -1,24 +1,7 @@
 open Parser
-
+open Environment
 type type_t = | Boolean_t of bool | Float_t of float | String_t of string [@@deriving show]
-type 'a result = | EvaluationError of string  | Value of type_t | NoneValue
-
-
-
-let new_env () = Hashtbl.create 1000
-
-
-
-let define env name value =
- Hashtbl.add env name value
-
-
-let get_var env name =
-  let res = Hashtbl.find_opt env name in
-  match res with
-  | None -> EvaluationError ("Unbound variable: " ^name ^" does not exist.")
-  | Some v -> v
-
+type result = | EvaluationError of string  | Value of type_t | NoneValue
 
 let print_result res =
   match res with
@@ -26,7 +9,7 @@ let print_result res =
 | Value x -> print_endline (show_type_t x)
 | NoneValue -> print_endline "NoneValue"
 
-let to_str (a:'a result) =
+let to_str (a:result) =
   match a with
   |NoneValue -> "None"
   |Value aa ->(
@@ -113,16 +96,26 @@ let rec eval_env (t:ast) env =
   match t with
   | EMPTY -> NoneValue
   (*Binary operators*)
-  | IS_EQAL (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_eq
-  | IS_NEQ (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_neq
-  | LT (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_lt
-  | LEQ (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_leq
-  | GT (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_gt
-  | GEQ (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_geq
-  | ADD (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_add
-  | SUB (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_sub
-  | MULT (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_mult
-  | DIV (expr_left, expr_right) -> binary_operator env expr_left expr_right fn_div
+  | IS_EQAL (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_eq
+  | IS_NEQ (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_neq
+  | LT (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_lt
+  | LEQ (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_leq
+  | GT (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_gt
+  | GEQ (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_geq
+  | ADD (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_add
+  | SUB (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_sub
+  | MULT (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_mult
+  | DIV (expr_left, expr_right) ->
+      binary_operator env expr_left expr_right fn_div
 
   (*Unary operators*)
   |NOT (expr) -> unary_operator env expr fn_not
@@ -136,17 +129,24 @@ let rec eval_env (t:ast) env =
  | NIL_VALUE -> NoneValue
 
 (*Statements*)
- | ExpressionStatement expr -> let v = eval_env expr env  in print_result v; v
+ | ExpressionStatement expr ->
+   let v = eval_env expr env  in print_result v; v
  | PrintStatement expr -> unary_operator env expr fn_print
  | StatementSequence l ->
    (match l with
    |[] -> NoneValue
-   |expr::q -> let _ = eval_env expr env in  eval_env (StatementSequence q)env)
+   |expr::q -> let _ = eval_env expr env in
+    eval_env (StatementSequence q)env)
 
 (*Variable*)
-| VariableDeclaration ({name=n;value=var_t}) -> var_decl_operator env n var_t
-| VariableAccess s -> get_var env s
-
+| VariableDeclaration ({name=n;value=var_t}) ->
+  var_decl_operator env n var_t
+| VariableAccess s ->
+  (match Environment.get_var env s with
+  | Variable x -> x
+  | UnboundVariableError msg -> EvaluationError ("UnboundValueError : "^ msg))
+| VariableMutation ({name=n;value=var_t}) ->
+  var_decl_operator env n var_t
 |_ -> EvaluationError ("Not implemented : " ^ show_ast t)
 
 
@@ -172,6 +172,7 @@ and var_decl_operator env (name:string) (t:ast) =
   let v = eval_env t env in
   match v with
   | EvaluationError msg -> EvaluationError msg
-  | _-> print_endline ("Var(" ^ name ^ ") = " ^ (to_str v)); (define env name v); NoneValue
+  | _-> print_endline ("Var(" ^ name ^ ") = " ^ (to_str v));
+    (Environment.define env name v); NoneValue
 
-in eval_env t (new_env ())
+in eval_env t (Environment.new_env ())

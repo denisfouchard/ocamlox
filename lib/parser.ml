@@ -69,6 +69,7 @@ type ast =
 
  |VariableDeclaration of {name:string; value:ast}
  |VariableAccess of string
+ |VariableMutation of {name:string; value:ast}
  [@@deriving show]
 
 let is_primary (token:token) =
@@ -211,6 +212,7 @@ and parse_declaration tokens =
   match tokens with
   |[] -> EMPTY
   |{ token_type = VAR; _}::var_decl -> parse_variable_declaration var_decl
+  |{ token_type = IDENTIFIER; _}::{ token_type = EQUAL; _}::_ -> parse_variable_mutation tokens
   |{ token_type = EOF; _}::_ -> EMPTY
   |{ token_type = PRINT; _}::q -> let expr, _ = parse_expression q in
     (PrintStatement expr)
@@ -224,6 +226,15 @@ and parse_variable_declaration expr =
     let decl_t,_  = parse_expression decl_expr in
     VariableDeclaration ({name=identifier.lexeme;value=decl_t})
   |_-> failwith("[VariableDeclarationError] Wrong variable declaration")
+
+and parse_variable_mutation expr =
+  match expr with
+  |identifier::{token_type = EQUAL; _}::mut_expr
+    when identifier.token_type == IDENTIFIER ->
+    let mut_t,_  = parse_expression mut_expr in
+    VariableMutation ({name=identifier.lexeme;value=mut_t})
+  |_-> failwith("[VariableMutationError] Wrong variable mutation")
+
 
 let parse tokens =
   let ast, remaining = parse_expression tokens in
