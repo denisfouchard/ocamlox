@@ -274,10 +274,13 @@ let scan_token (ctx:scanner_ctx) =
                       | _ when is_next '=' ctx_ -> scan_second_token EQUAL ctx_
                       | _ -> add_token EQUAL None (add_token acc None ctx_))
             (* Case of // for comment *)
-            |'/' -> (match acc with
+            |'/' -> if is_next '/' ctx_ then scan_second_token SLASH ctx_ else
+              (match acc with
                       (*Comment*)
                       | SLASH -> (skip_line ctx_)
-                      |_ -> scan_second_token SLASH ctx_)
+                      | BOF -> add_token SLASH None ctx_
+                      |_ when is_next '/' ctx_ -> scan_second_token SLASH ctx_
+                      |_ -> add_token SLASH None (add_token acc None ctx_))
             |'"' -> scan_string (advance ctx_)
             | _ when parse_int c >= 0 -> scan_numerical  ctx_
             | _ when is_alpha c -> scan_identifier ctx_

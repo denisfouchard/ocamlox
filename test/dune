@@ -1,8 +1,7 @@
 (executable
  (name test_scanning)
- (libraries ocamlox))
+ (libraries ocamlox alcotest))
 
 (rule
  (alias runtest)
  (action (run ./test_scanning.exe)))
-
