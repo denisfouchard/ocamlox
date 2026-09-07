@@ -1,23 +1,37 @@
+module VarTable = Map.Make(String);;
 
-type env_type = Float_env of float | Bool_env of bool | String_env of string
+type type_t = | Boolean_t of bool | Float_t of float | String_t of string | NoneValue [@@deriving show]
 
 module Environment = struct
 
-  type t = Hashtbl of string * env_type
+  type t =
+    |Global of type_t VarTable.t
+    |Scope of {outside:t; local:t}
 
-  type 'a variable_access =
-    | Variable of 'a
-    | UnboundVariableError of string
+  let empty = Global VarTable.empty
+  let rec define (env: t) (name:string) (value:type_t) =
+    match env with
+    | Global env_t ->Global (VarTable.add  name value env_t)
+    | Scope {outside=env_out;local=env_t} ->
+      Scope {outside=env_out;local=(define env_t name value)}
 
-  let new_env () = Hashtbl.create 100
+  let rec get_var (env:t) (name:string) =
+    match env with
+    | Global env_t -> VarTable.find_opt name env_t
+    | Scope {outside=env_out;local=env_t} ->
+      let find_in_local = get_var env_t name in
+        match find_in_local with
+        | None -> get_var env_out name
+        | Some res -> Some res
 
-  let define env name value =
-   Hashtbl.add env name value
 
+  let create_local_scope (env:t) =
+    Scope {outside=env;local=empty}
 
-  let get_var env name =
-    let res = Hashtbl.find_opt env name in
-    match res with
-    | None -> UnboundVariableError (name ^" does not exist.")
-    | Some v -> Variable v
+  let rec delete_local_scope (env:t) =
+    match env with
+    | Global _ -> env
+    | Scope {outside=out;local=(Global _)} -> out
+    | Scope {outside=out;local=loc} ->
+      Scope {outside=out;local=(delete_local_scope loc)}
 end

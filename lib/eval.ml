@@ -1,32 +1,34 @@
 open Parser
 open Environment
-type type_t = | Boolean_t of bool | Float_t of float | String_t of string [@@deriving show]
-type result = | EvaluationError of string  | Value of type_t | NoneValue
+type result = | EvaluationError of string  | Value of type_t | Nil
 
 let print_result res =
   match res with
   |EvaluationError msg -> print_endline msg
 | Value x -> print_endline (show_type_t x)
-| NoneValue -> print_endline "NoneValue"
+| Nil -> print_endline "Nil"
 
 let to_str (a:result) =
   match a with
-  |NoneValue -> "None"
   |Value aa ->(
     match aa with
     |String_t s -> "\"" ^s ^"\""
     |Boolean_t b -> if b then "True" else "False"
-    |Float_t x -> string_of_float x)
-| EvaluationError s -> s
+    |Float_t x -> string_of_float x
+    |NoneValue -> "None")
+  | EvaluationError s -> s
+  |Nil -> "Nil"
 
 let fn_not (b: type_t) =
   match b with
   |Boolean_t bb -> Value (Boolean_t (not bb))
+  |NoneValue -> EvaluationError ("Wrong type, expected Bool, got None")
   |Float_t _ -> EvaluationError ("Wrong type, expected Bool, got Float")
   |String_t _ -> EvaluationError ("Wrong type, expected Bool, got String")
 
 let fn_neg (b: type_t) =
   match b with
+  |NoneValue -> EvaluationError ("Wrong type, expected Float, got None")
   |Boolean_t bb -> EvaluationError ("Wrong type, expected Float, got Bool")
   |Float_t x -> Value (Float_t (-.x))
   |String_t _ -> EvaluationError ("Wrong type, expected Float, got String")
@@ -88,91 +90,94 @@ let fn_leq (a:type_t) (b:type_t)  =
   |_ -> EvaluationError "missmatch types"
 
 let fn_print (a:type_t) =
-  print_endline (to_str (Value a)); NoneValue
+  print_endline (to_str (Value a)); Nil
 
 
 let eval (t:ast) =
 let rec eval_env (t:ast) env =
   match t with
-  | EMPTY -> NoneValue
+  | EMPTY ->env, Value NoneValue
   (*Binary operators*)
-  | IS_EQAL (expr_left, expr_right) ->
+  | IS_EQAL (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_eq
-  | IS_NEQ (expr_left, expr_right) ->
+  | IS_NEQ (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_neq
-  | LT (expr_left, expr_right) ->
+  | LT (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_lt
-  | LEQ (expr_left, expr_right) ->
+  | LEQ (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_leq
-  | GT (expr_left, expr_right) ->
+  | GT (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_gt
-  | GEQ (expr_left, expr_right) ->
+  | GEQ (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_geq
-  | ADD (expr_left, expr_right) ->
+  | ADD (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_add
-  | SUB (expr_left, expr_right) ->
+  | SUB (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_sub
-  | MULT (expr_left, expr_right) ->
+  | MULT (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_mult
-  | DIV (expr_left, expr_right) ->
+  | DIV (expr_left, expr_right) ->env,
       binary_operator env expr_left expr_right fn_div
 
   (*Unary operators*)
-  |NOT (expr) -> unary_operator env expr fn_not
-  |NEG (expr) -> unary_operator env expr fn_neg
+  |NOT (expr) ->env, unary_operator env expr fn_not
+  |NEG (expr) ->env, unary_operator env expr fn_neg
 
  (*Literals*)
- | NUMBER_VALUE x -> Value (Float_t x)
- | STRING_VALUE s -> Value (String_t s)
- | BOOL_TRUE -> Value (Boolean_t true)
- | BOOL_FALSE -> Value (Boolean_t false)
- | NIL_VALUE -> NoneValue
+ | NUMBER_VALUE x ->env, Value (Float_t x)
+ | STRING_VALUE s ->env, Value (String_t s)
+ | BOOL_TRUE ->env, Value (Boolean_t true)
+ | BOOL_FALSE ->env, Value (Boolean_t false)
+ | NIL_VALUE ->env, Value NoneValue
 
 (*Statements*)
  | ExpressionStatement expr ->
-   let v = eval_env expr env  in print_result v; v
- | PrintStatement expr -> unary_operator env expr fn_print
+    let env_, v = eval_env expr env  in print_result v; env, v
+ | PrintStatement expr ->env, unary_operator env expr fn_print
  | StatementSequence l ->
    (match l with
-   |[] -> NoneValue
-   |expr::q -> let _ = eval_env expr env in
-    eval_env (StatementSequence q)env)
+     |[] -> env, Nil
+     |expr::q -> let env, res = eval_env expr env in
+    eval_env (StatementSequence q) env)
 
 (*Variable*)
 | VariableDeclaration ({name=n;value=var_t}) ->
   var_decl_operator env n var_t
-| VariableAccess s ->
+| VariableAccess s ->env,
   (match Environment.get_var env s with
-  | Variable x -> x
-  | UnboundVariableError msg -> EvaluationError ("UnboundValueError : "^ msg))
+  | Some x -> Value x
+  | None -> EvaluationError ("UnboundValueError : "^ s ^" not defined" ))
 | VariableMutation ({name=n;value=var_t}) ->
   var_decl_operator env n var_t
-|_ -> EvaluationError ("Not implemented : " ^ show_ast t)
+|_ ->env, EvaluationError ("Not implemented : " ^ show_ast t)
 
 
 and binary_operator env left_t right_t op_fn =
-  let left_v = eval_env left_t env  in
+  let _, left_v = eval_env left_t env  in
   match left_v with
   |EvaluationError msg -> EvaluationError msg
-  |NoneValue -> EvaluationError "expected value, got none"
-  |Value left_vv -> let right_v = eval_env right_t env in
+  |Nil -> EvaluationError "expected value, got none"
+  |Value left_vv ->
+    let _, right_v = eval_env right_t env in
     (match right_v with
     |EvaluationError msg -> EvaluationError msg
-    |NoneValue -> EvaluationError "expected value, got none"
+    |Nil -> EvaluationError "expected value, got none"
     |Value right_vv -> op_fn left_vv right_vv)
 
 and unary_operator env t op_fn =
-  let v = eval_env t env in
+  let _, v = eval_env t env in
   match v with
   | EvaluationError msg -> EvaluationError msg
-  |NoneValue -> EvaluationError "expected value, got none"
+  | Nil -> EvaluationError "expected value, got none"
   | Value vv -> op_fn vv
 
 and var_decl_operator env (name:string) (t:ast) =
-  let v = eval_env t env in
+  let env_, v = eval_env t env in
   match v with
-  | EvaluationError msg -> EvaluationError msg
-  | _-> print_endline ("Var(" ^ name ^ ") = " ^ (to_str v));
-    (Environment.define env name v); NoneValue
+  | EvaluationError msg -> env, (EvaluationError msg)
+  | Nil-> env, EvaluationError "can not define a variable with no value"
+  | Value vv->
+    print_endline ("Var(" ^ name ^ ") = " ^ (to_str v));
+    (Environment.define env_ name vv), Nil
 
-in eval_env t (Environment.new_env ())
+in let _, res = eval_env t (Environment.empty) in res
