@@ -173,6 +173,8 @@ let eval (t:ast) =
         )
       | IfStatement ({condition=c; then_branch=tb; else_branch=eb}) ->
           eval_if_statement c tb eb env
+      | WhileStatement({condition=c; loop=l}) ->
+          eval_while_statement c l env
 
 
 
@@ -243,6 +245,28 @@ let eval (t:ast) =
       | None -> env, Nil
       | Some else_b -> (eval_env else_b env)
       )
+
+    | Value v -> env, EvaluationError ("Error: expected condition of type bool, got " ^ show_type_type v)
+
+  and eval_while_statement (condition:ast) (loop:ast)  env =
+    let env, condition_res = eval_env condition env in
+    print_endline (show_result condition_res);
+    let condition_res =
+      (
+      match condition_res with
+      | Value (Float_t x) -> Value (Boolean_t (not (Float.equal x 0.)))
+      |_ -> condition_res
+      )
+    in
+    match condition_res with
+    | EvaluationError msg -> env, condition_res
+    | Nil -> env, EvaluationError ("Error: expected value inside conditional while, got Nil")
+    | Value (Boolean_t b) ->
+      if b then
+        let env, _ = (eval_env loop env)
+        in eval_while_statement condition loop env
+        else env, Nil
+
 
     | Value v -> env, EvaluationError ("Error: expected condition of type bool, got " ^ show_type_type v)
 

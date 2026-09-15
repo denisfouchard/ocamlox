@@ -15,11 +15,14 @@ declaration    → varDecl
 
 statement      → exprStmt
               | ifStmt
+              | whileStmt
               | printStmt
               | block ;
 
 ifStmt         → "if" "(" expression ")" statement
               ( "else" statement )? ;
+
+whileStmt      -> "while" "(" expression ")" statement
 
 block          → "{" declaration* "}" ;
 
@@ -78,6 +81,9 @@ type ast =
                     then_branch:ast;
                     else_branch: ast option
                   }
+
+  | WhileStatement of {condition:ast;
+                     loop:ast}
 
  | VariableDeclaration of {name:string; value:ast}
  | VariableAccess of string
@@ -266,6 +272,8 @@ and parse_declaration tokens =
       (PrintStatement expr), next
     | { token_type = IF; _}::_->
       parse_if_statement tokens
+    | { token_type = WHILE; _}::_->
+      parse_while_statement tokens
 
     (*Scope*)
     | {token_type =  LEFT_BRACE;_}::tx ->
@@ -319,6 +327,18 @@ and parse_if_statement expr =
         ), next
 
   | _-> failwith "Expected if statement"
+
+and parse_while_statement expr =
+  match expr with
+  | {token_type = WHILE; _}::t::if_expr  when t.token_type == LEFT_PAREN ->
+    let condition_expr, next = parse_expression (t::if_expr) in
+    let loop_expr, next = parse_declaration next in
+       WhileStatement (
+        {condition=condition_expr;
+          loop=loop_expr}
+        ), next
+
+  | _-> failwith "Expected while statement"
 
 
 

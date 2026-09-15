@@ -1,0 +1,3 @@
+var b = 0;
+while (b<3){print "foo"; b=b+1}
+print b+2;
