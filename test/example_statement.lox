@@ -1,5 +1,15 @@
-//print (1+2) + 3 / (5-4)
-print "1. Hello World";
-print "2. Hello World";
-print false;
+var foo = 5;
+foo = 3;
 print true;
+foo + 3;
+//3+3;
+//print foo;
+
+if (0) {
+    var bar=12;
+    foo+bar;
+    foo = 7;
+
+    foo+bar;
+    foo = 99;}
+ else {print "false"};

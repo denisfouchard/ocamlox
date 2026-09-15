@@ -1,4 +1,3 @@
-
 (* LOWEST TO HIGHEST
 Name	        Operators	    Associates
 ---------------------------------------
@@ -7,9 +6,26 @@ Comparison	  > >= < <=	    Left
 Term	        - +	          Left
 Factor	      / *	          Left
 Unary	        ! -	          Right
-*)
 
-(*
+
+program        → declaration* EOF ;
+
+declaration    → varDecl
+               | statement ;
+
+statement      → exprStmt
+              | ifStmt
+              | printStmt
+              | block ;
+
+ifStmt         → "if" "(" expression ")" statement
+              ( "else" statement )? ;
+
+block          → "{" declaration* "}" ;
+
+exprStmt       → expression ";" ;
+printStmt      → "print" expression ";"
+
 expression     → equality ;
 equality       → comparison ( ( "!=" of ast * ast | "==" ) comparison )* ;
 comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
@@ -18,23 +34,13 @@ factor         → unary ( ( "/" | "*" ) unary )* ;
 unary          → ( "!" | "-" ) unary| primary ;
 primary        → NUMBER | STRING | "true" | "false" | "nil"
                | "(" expression ")" ;
+
 *)
-
-(*
-program        → statement* EOF ;
-
-statement      → exprStmt
-               | printStmt ;
-
-exprStmt       → expression ";" ;
-printStmt      → "print" expression ";" *)
-
 open Scanner
-open Ppx_deriving_runtime
-type binary_perator = IS_EQAL  | IS_NEQ | LT | LEQ | GT | GEQ | ADD | SUB | MULT | DIV
-type unary_operator = NOT | NEG
-type litteral = NUMBER_VALUE | STRING_VALUE | BOOL_TRUE | BOOL_FALSE | NIL_VALUE
 
+
+type tok_l = Scanner.token list
+[@@deriving show]
 
 type ast =
   | EMPTY
@@ -61,36 +67,43 @@ type ast =
  | BOOL_FALSE
  | NIL_VALUE
 
+ (**DECLARATIONS**)
  (*Statements*)
- |StatementSequence of ast list
- |Statement of ast
- |ExpressionStatement of ast
- |PrintStatement of ast
+ | StatementSequence of ast list
 
- |VariableDeclaration of {name:string; value:ast}
- |VariableAccess of string
- |VariableMutation of {name:string; value:ast}
- [@@deriving show]
+ | Statement of ast
+ | ExpressionStatement of ast
+ | PrintStatement of ast
+ | IfStatement of {condition:ast;
+                    then_branch:ast;
+                    else_branch: ast option
+                  }
+
+ | VariableDeclaration of {name:string; value:ast}
+ | VariableAccess of string
+ | VariableMutation of {name:string; value:ast}
+
+ | Block of ast list
+[@@deriving show]
 
 let is_primary (token:token) =
   match token.token_type with
-  | NIL -> true
-  | TRUE -> true
-  | FALSE -> true
-  | VAR -> true
-  | IDENTIFIER -> true
-  | STRING -> true
-  | _ -> false
+    | NIL -> true
+    | TRUE -> true
+    | FALSE -> true
+    | VAR -> true
+    | IDENTIFIER -> true
+    | STRING -> true
+    | _ -> false
 
 let is_compare (token:token) =
   match token.token_type with
-  | GREATER -> true
-  | GREATER_EQUAL -> true
-  | LESS -> true
-  | LESS_EQUAL -> true
-  | _ -> false
+    | GREATER -> true
+    | GREATER_EQUAL -> true
+    | LESS -> true
+    | LESS_EQUAL -> true
+    | _ -> false
 
-type tok_l = Scanner.token list [@@deriving show]
 
 let rec parse_expression tokens =
   parse_equality tokens
@@ -126,8 +139,7 @@ and parse_comparison tokens =
         let right, next = parse_term next in
         loop (LEQ (acc, right)) next
     | _ -> acc, tokens
-  in
-  loop acc tokens
+  in loop acc tokens
 
 and parse_term tokens =
   let acc, tokens = parse_factor tokens in
@@ -140,104 +152,178 @@ and parse_term tokens =
         let right, next = parse_factor next in
         loop (SUB (acc, right)) next
     | _ -> acc, tokens
-  in
-  loop acc tokens
+  in loop acc tokens
 
 and parse_factor tokens =
   let acc, tokens = parse_unary tokens in
   let rec loop acc tokens =
     match tokens with
-    | { token_type = STAR; _ } :: next ->
-        let right, next = parse_unary next in
-        loop (MULT (acc, right)) next
-    | { token_type = SLASH; _ } :: next ->
-        let right, next = parse_unary next in
-        loop (DIV (acc, right)) next
-    | _ -> acc, tokens
-  in
-  loop acc tokens
+      | { token_type = STAR; _ } :: next ->
+          let right, next = parse_unary next in
+          loop (MULT (acc, right)) next
+      | { token_type = SLASH; _ } :: next ->
+          let right, next = parse_unary next in
+          loop (DIV (acc, right)) next
+      | _ -> acc, tokens
+  in loop acc tokens
 
 and parse_unary tokens =
   match tokens with
-  | { token_type = BANG; _ } :: next ->
-      let expr, next = parse_unary next in
-      NOT expr, next
-  | { token_type = MINUS; _ } :: next ->
-      let expr, next = parse_unary next in
-      NEG expr, next
-  | _ -> parse_primary tokens
+    | { token_type = BANG; _ } :: next ->
+        let expr, next = parse_unary next in
+        NOT expr, next
+    | { token_type = MINUS; _ } :: next ->
+        let expr, next = parse_unary next in
+        NEG expr, next
+    | _ -> parse_primary tokens
 
 and parse_primary tokens =
   match tokens with
-  | [] -> failwith "Unexpected end of input"
-  | { token_type = LEFT_PAREN; _ } :: next ->
-      let expr, next = parse_expression next in
-      (match next with
-        | { token_type = RIGHT_PAREN; _ } :: next' -> expr, next'
-       | _ -> failwith "Expected ')' after expression")
-  | { token_type = NIL; _ } :: next -> NIL_VALUE, next
-  | { token_type = TRUE; _ } :: next -> BOOL_TRUE, next
-  | { token_type = FALSE; _ } :: next -> BOOL_FALSE, next
-  | { token_type = STRING; literal = Some (STRING_LITERAL v); _ } :: next -> STRING_VALUE v, next
-  | { token_type = NUMBER; literal = Some (NUMBER_LITERAL v); _ } :: next -> NUMBER_VALUE v, next
-  (* variable access*)
-  | token:: next when token.token_type == IDENTIFIER -> parse_var token, next
-  | token :: _ -> failwith ("[ParsingError]Invalid token: " ^ show_tokenType token.token_type)
+    | [] -> failwith "Unexpected end of input"
+    | { token_type = LEFT_PAREN; _ } :: next ->
+        let expr, next = parse_expression next in
+        (match next with
+          | { token_type = RIGHT_PAREN; _ } :: next' -> expr, next'
+          | _ -> failwith "Expected ')' after expression"
+        )
+    | { token_type = NIL; _ } :: next -> NIL_VALUE, next
+    | { token_type = TRUE; _ } :: next -> BOOL_TRUE, next
+    | { token_type = FALSE; _ } :: next -> BOOL_FALSE, next
+    | { token_type = STRING; literal = Some (STRING_LITERAL v); _ } :: next -> STRING_VALUE v, next
+    | { token_type = NUMBER; literal = Some (NUMBER_LITERAL v); _ } :: next -> NUMBER_VALUE v, next
+    (* variable access*)
+    | token:: next when token.token_type == IDENTIFIER -> parse_var token, next
+    | token :: _ -> failwith ("[ParsingError] Invalid token " ^ token.lexeme ^ " at line:"^(string_of_int token.line))
+
 and parse_var token =
   match token.literal with
-  | Some (STRING_LITERAL name) -> VariableAccess name
-  | _-> failwith("[ParsingError] Unbound variable")
+    | Some (STRING_LITERAL name) -> VariableAccess name
+    | _-> failwith("[ParsingError] Unbound variable")
 
+
+
+
+(** Helper functions for parsing statements**)
 let rec parse_semicol tokens acc=
   match tokens with
-  |[] -> failwith ("Unexpected EOF, missing ;")
-  |{token_type = SEMICOLON; _}::next -> acc, next
-  |tok::tx -> let st, next = parse_semicol tx [] in tok::st, next
+    | [] | {token_type = EOF; _}::_ -> failwith ("Unexpected EOF, missing ;")
+    | {token_type = SEMICOLON; _}::next -> acc, next
+    | tok::tx -> let st, next = parse_semicol tx [] in tok::st, next
+
+
+
+let parse_scope tokens =
+  let rec parse_scope_aux tokens p =
+    match tokens with
+      | [] | {token_type = EOF; _}::_ -> failwith ("Unexpected EOF, missing }")
+      | tok::next when tok.token_type == RIGHT_BRACE ->
+          if p ==0 then
+            (match next with
+              | {token_type = SEMICOLON;_}::nnext -> [], nnext
+              | _-> [], next
+            )
+          else
+            let st, next = (parse_scope_aux next (p-1) ) in
+            tok::st, next
+      | last::right_brace::next
+        when last.token_type != SEMICOLON
+        && right_brace.token_type == RIGHT_BRACE ->
+        parse_scope_aux (last::(semi_col_token ())::right_brace::next) p
+      | tok::next when tok.token_type == LEFT_BRACE ->
+      let st, next = (parse_scope_aux next (p+1)) in tok::st, next
+      | tok::next->
+      let st, next = (parse_scope_aux next p) in tok::st, next
+  and semi_col_token () = {token_type=SEMICOLON; lexeme=";";literal=None;line=0}
+  in parse_scope_aux tokens 0
+
 
 let rec parse_program tokens =
   parse_declaration_sequence tokens
 
 and parse_declaration_sequence tokens =
   let rec loop tokens =
-  let statement_tokens, next = parse_semicol tokens [] in
-  let ast = parse_declaration statement_tokens in
+  let ast, next = parse_declaration tokens in
     match next with
-    | [] -> failwith("[StatementParsingError]Unexpected EOF, missing EOF token")
-    | { token_type = EOF; _}::_ -> [ast]
+    | [] | { token_type = EOF; _}::_-> [ast]
     | _ -> ast :: (loop next)
 
   in StatementSequence (loop tokens)
 
 and parse_declaration tokens =
   match tokens with
-  |[] -> EMPTY
-  |{ token_type = VAR; _}::var_decl -> parse_variable_declaration var_decl
-  |{ token_type = IDENTIFIER; _}::{ token_type = EQUAL; _}::_ -> parse_variable_mutation tokens
-  |{ token_type = EOF; _}::_ -> EMPTY
-  |{ token_type = PRINT; _}::q -> let expr, _ = parse_expression q in
-    (PrintStatement expr)
-  | _ ->  let expr, _ = parse_expression tokens in
-    (ExpressionStatement expr)
+    (*Simple Statements/declarations*)
+    | [] -> EMPTY, []
+    | { token_type = VAR; _}::var_decl ->
+      let statement_tokens, next = parse_semicol var_decl [] in
+      parse_variable_declaration statement_tokens, next
+    | { token_type = IDENTIFIER; _}::{ token_type = EQUAL; _}::_ ->
+      let statement_tokens, next = parse_semicol tokens [] in
+      parse_variable_mutation statement_tokens, next
+    | { token_type = EOF; _}::_ -> EMPTY, []
+    | { token_type = PRINT; _}::q ->
+      let statement_tokens, next = parse_semicol q [] in
+      let expr, _ = parse_expression statement_tokens in
+      (PrintStatement expr), next
+    | { token_type = IF; _}::_->
+      parse_if_statement tokens
+
+    (*Scope*)
+    | {token_type =  LEFT_BRACE;_}::tx ->
+      (
+      let scope_tokens, next = parse_scope tx in
+      let decl_seq = parse_declaration_sequence scope_tokens in
+      (**print_endline ("======SCOPE AST=====\n" ^ show_ast decl_seq);**)
+      match decl_seq with
+        | StatementSequence l_decl when List.length l_decl > 0 ->
+          Block l_decl, next
+        | _-> failwith("[BlockParsingError] Expected at least one statement")
+      )
+
+    | _ ->  let statement_tokens, next = parse_semicol tokens [] in
+            let expr, _ = parse_expression statement_tokens in
+            (ExpressionStatement expr), next
 
 and parse_variable_declaration expr =
   match expr with
-  |identifier::{token_type = EQUAL; _}::decl_expr
-    when identifier.token_type == IDENTIFIER ->
-    let decl_t,_  = parse_expression decl_expr in
-    VariableDeclaration ({name=identifier.lexeme;value=decl_t})
-  |_-> failwith("[VariableDeclarationError] Wrong variable declaration")
+    | identifier::{token_type = EQUAL; _}::decl_expr
+        when identifier.token_type == IDENTIFIER ->
+          let decl_t,_  = parse_expression decl_expr in
+          VariableDeclaration ({name=identifier.lexeme;value=decl_t})
+    | _-> failwith("[VariableDeclarationError] Wrong variable declaration")
 
 and parse_variable_mutation expr =
   match expr with
-  |identifier::{token_type = EQUAL; _}::mut_expr
-    when identifier.token_type == IDENTIFIER ->
-    let mut_t,_  = parse_expression mut_expr in
-    VariableMutation ({name=identifier.lexeme;value=mut_t})
-  |_-> failwith("[VariableMutationError] Wrong variable mutation")
+  | identifier::{token_type = EQUAL; _}::mut_expr
+      when identifier.token_type == IDENTIFIER ->
+        let mut_t,_  = parse_expression mut_expr in
+        VariableMutation ({name=identifier.lexeme;value=mut_t})
+  | _-> failwith("[VariableMutationError] Wrong variable mutation")
+
+and parse_if_statement expr =
+  match expr with
+  | {token_type = IF; _}::t::if_expr  when t.token_type == LEFT_PAREN ->
+    let condition_expr, next = parse_expression (t::if_expr) in
+    let then_expr, next = parse_declaration next in
+    let else_expr, next =
+    (
+      match next with
+        | {token_type = ELSE; _}::else_tokens ->
+          let else_expr, next = parse_declaration else_tokens in
+            (Some else_expr), next
+        |_ -> None, next
+    )
+      in IfStatement (
+        {condition=condition_expr;
+          then_branch=then_expr;
+          else_branch=else_expr}
+        ), next
+
+  | _-> failwith "Expected if statement"
+
 
 
 let parse tokens =
   let ast, remaining = parse_expression tokens in
   match remaining with
-  | [] | [{ token_type = EOF; _ }] -> ast
-  | t :: _ -> failwith ("Unexpected trailing token: " ^ show_tokenType t.token_type)
+    | [] | [{ token_type = EOF; _ }] -> ast
+    | t :: _ -> failwith ("Unexpected trailing token: " ^ show_tokenType t.token_type)

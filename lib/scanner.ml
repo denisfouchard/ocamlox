@@ -97,6 +97,7 @@ let init_scanner (source_code:string) =
 
 let is_at_end (ctx:scanner_ctx) = ctx.current >= String.length ctx.source
 
+
 let add_token_aux token_type lexeme literal line ctx =
 (* Append at the beggining !!!!*)
   let new_tokens = {
