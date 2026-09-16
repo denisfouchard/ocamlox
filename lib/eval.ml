@@ -177,10 +177,24 @@ let eval (t:ast) =
             let local_env', res = eval_env expr local_env in
               eval_env (StatementSequence q) local_env'
         )
+
       | IfStatement ({condition=c; then_branch=tb; else_branch=eb}) ->
           eval_if_statement c tb eb env
       | WhileStatement({condition=c; loop=l}) ->
           eval_while_statement c l env
+
+      | ForStatement (
+            {
+              var_decl=var_init;
+              loop_condition=loop_condition;
+              incr=incr;
+              loop=loop
+            }
+          ) ->
+          let local_env = (Environment.create_local_scope env) in
+          let local_env, res =
+            eval_for_statement var_init loop_condition incr loop local_env
+          in (Environment.delete_local_scope local_env), res
 
 
 
@@ -309,5 +323,16 @@ let eval (t:ast) =
 
 
     | Value v -> env, EvaluationError ("Error: expected condition of type bool, got " ^ show_type_type v)
+
+  and eval_for_statement var_init loop_condition incr loop env =
+    let var_init_env, _ = eval_env var_init env in
+    let loop_incr =
+    (
+    match loop with
+    | Block l -> Block (l @ [incr])
+    | _ -> failwith ("Error: Incorrect format for loop execution")
+    ) in
+    eval_while_statement loop_condition loop_incr var_init_env
+
 
   in let _, res = eval_env t (Environment.empty) in res

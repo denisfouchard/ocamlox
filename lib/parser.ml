@@ -16,6 +16,7 @@ declaration    → varDecl
 statement      → exprStmt
               | ifStmt
               | whileStmt
+              | forStmt
               | printStmt
               | block ;
 
@@ -91,8 +92,13 @@ type ast =
                     else_branch: ast option
                   }
 
-  | WhileStatement of {condition:ast;
+ | WhileStatement of {condition:ast;
                      loop:ast}
+ | ForStatement of {var_decl:ast;
+                    loop_condition:ast;
+                    incr:ast;
+                    loop:ast
+                  }
 
  | VariableDeclaration of {name:string; value:ast}
  | VariableAccess of string
@@ -271,6 +277,30 @@ let parse_scope tokens =
   and semi_col_token () = {token_type=SEMICOLON; lexeme=";";literal=None;line=0}
   in parse_scope_aux tokens 0
 
+let parse_paren tokens =
+  let rec parse_paren_aux tokens p =
+    match tokens with
+      | [] | {token_type = EOF; _}::_ -> failwith ("Unexpected EOF, missing }")
+      | tok::next when tok.token_type == RIGHT_PAREN ->
+          if p ==0 then
+            (match next with
+              | {token_type = SEMICOLON;_}::nnext -> [], nnext
+              | _-> [], next
+            )
+          else
+            let st, next = (parse_paren_aux next (p-1) ) in
+            tok::st, next
+      | last::right_PAREN::next
+        when last.token_type != SEMICOLON
+        && right_PAREN.token_type == RIGHT_PAREN ->
+        parse_paren_aux (last::(semi_col_token ())::right_PAREN::next) p
+      | tok::next when tok.token_type == LEFT_BRACE ->
+      let st, next = (parse_paren_aux next (p+1)) in tok::st, next
+      | tok::next->
+      let st, next = (parse_paren_aux next p) in tok::st, next
+  and semi_col_token () = {token_type=SEMICOLON; lexeme=";";literal=None;line=0}
+  in parse_paren_aux tokens 0
+
 
 let rec parse_program tokens =
   parse_declaration_sequence tokens
@@ -303,6 +333,8 @@ and parse_declaration tokens =
       parse_if_statement tokens
     | { token_type = WHILE; _}::_->
       parse_while_statement tokens
+    | { token_type = FOR; _}::next ->
+      parse_for_statement next
 
     (*Scope*)
     | {token_type =  LEFT_BRACE;_}::tx ->
@@ -320,26 +352,26 @@ and parse_declaration tokens =
             let expr, _ = parse_expression statement_tokens in
             (ExpressionStatement expr), next
 
-and parse_variable_declaration expr =
-  match expr with
-    | identifier::{token_type = EQUAL; _}::decl_expr
+and parse_variable_declaration tokens =
+  match tokens with
+    | identifier::{token_type = EQUAL; _}::decl_tokens
         when identifier.token_type == IDENTIFIER ->
-          let decl_t,_  = parse_expression decl_expr in
+        let decl_t,_  = parse_expression decl_tokens in
           VariableDeclaration ({name=identifier.lexeme;value=decl_t})
     | _-> failwith("[VariableDeclarationError] Wrong variable declaration")
 
-and parse_variable_mutation expr =
-  match expr with
-  | identifier::{token_type = EQUAL; _}::mut_expr
+and parse_variable_mutation tokens =
+  match tokens with
+  | identifier::{token_type = EQUAL; _}::mut_tokens
       when identifier.token_type == IDENTIFIER ->
-        let mut_t,_  = parse_expression mut_expr in
+      let mut_t,_  = parse_expression mut_tokens in
         VariableMutation ({name=identifier.lexeme;value=mut_t})
   | _-> failwith("[VariableMutationError] Wrong variable mutation")
 
-and parse_if_statement expr =
-  match expr with
-  | {token_type = IF; _}::t::if_expr  when t.token_type == LEFT_PAREN ->
-    let condition_expr, next = parse_expression (t::if_expr) in
+and parse_if_statement tokens =
+        match tokens with
+        | {token_type = IF; _}::t::if_tokens  when t.token_type == LEFT_PAREN ->
+    let condition_expr, next = parse_expression (t::if_tokens) in
     let then_expr, next = parse_declaration next in
     let else_expr, next =
     (
@@ -357,10 +389,10 @@ and parse_if_statement expr =
 
   | _-> failwith "Expected if statement"
 
-and parse_while_statement expr =
-  match expr with
-  | {token_type = WHILE; _}::t::if_expr  when t.token_type == LEFT_PAREN ->
-    let condition_expr, next = parse_expression (t::if_expr) in
+and parse_while_statement tokens =
+  match tokens with
+  | {token_type = WHILE; _}::t::while_tokens  when t.token_type == LEFT_PAREN ->
+    let condition_expr, next = parse_expression (t::while_tokens) in
     let loop_expr, next = parse_declaration next in
        WhileStatement (
         {condition=condition_expr;
@@ -368,6 +400,34 @@ and parse_while_statement expr =
         ), next
 
   | _-> failwith "Expected while statement"
+
+and parse_for_statement tokens =
+  match tokens with
+  | {token_type = LEFT_PAREN; _}::next ->
+    (
+    let clauses_tokens, next = parse_paren next in
+    let clauses = parse_declaration_sequence clauses_tokens in
+    match clauses with
+    | StatementSequence s ->
+      (
+        match s with
+        | var_init::loop_condition::incr::[] ->
+          let loop, next = parse_declaration next in
+
+         ForStatement (
+           {
+             var_decl=var_init;
+             loop_condition=loop_condition;
+             incr=incr;
+             loop=loop
+           }
+         ), next
+
+        |_ -> failwith "Incorrect for loop clauses"
+      )
+    |_ -> failwith "Incorrect for loop clauses"
+    )
+  | _-> failwith "[For loop error] Expected clauses between parentheses"
 
 
 
