@@ -29,7 +29,12 @@ block          → "{" declaration* "}" ;
 exprStmt       → expression ";" ;
 printStmt      → "print" expression ";"
 
-expression     → equality ;
+expression     → assignment ;
+assignment     → IDENTIFIER "=" assignment
+               | logic_or ;
+logic_or       → logic_and ( "or" logic_and )* ;
+logic_and      → equality ( "and" equality )* ;
+
 equality       → comparison ( ( "!=" of ast * ast | "==" ) comparison )* ;
 comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
@@ -58,6 +63,10 @@ type ast =
   | SUB of ast * ast
   | MULT of ast * ast
   | DIV of ast * ast
+
+  (*Logical operations*)
+  | OR of ast * ast
+  | AND of ast * ast
 
   (*Unary operators*)
   |NOT of ast
@@ -112,7 +121,27 @@ let is_compare (token:token) =
 
 
 let rec parse_expression tokens =
-  parse_equality tokens
+  parse_logic_or tokens
+
+and parse_logic_or tokens =
+  let acc, tokens = parse_logic_and tokens in
+  let rec loop acc tokens =
+    match tokens with
+    | { token_type = OR; _ } :: next ->
+      let right, next = parse_logic_and next in
+      loop (OR (acc, right)) next
+    |_ -> acc, tokens
+  in loop acc tokens
+
+and parse_logic_and tokens =
+  let acc, tokens = parse_equality tokens in
+  let rec loop acc tokens =
+    match tokens with
+    | { token_type = AND; _ } :: next ->
+      let right, next = parse_equality next in
+      loop (AND (acc, right)) next
+    |_ -> acc, tokens
+  in loop acc tokens
 
 and parse_equality tokens =
   let acc, tokens = parse_comparison tokens in

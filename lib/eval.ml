@@ -105,7 +105,7 @@ let fn_print (a:type_t) =
 let eval (t:ast) =
   let rec eval_env (t:ast) env =
     match t with
-      | EMPTY ->env, Value NoneValue
+      | EMPTY -> env, Value NoneValue
       (*Binary operators*)
       | IS_EQAL (expr_left, expr_right) ->env,
           binary_operator env expr_left expr_right fn_eq
@@ -127,6 +127,12 @@ let eval (t:ast) =
           binary_operator env expr_left expr_right fn_mult
       | DIV (expr_left, expr_right) ->env,
           binary_operator env expr_left expr_right fn_div
+
+      (*Logical operators*)
+      | OR (left, right) -> env,
+        or_operator env left right
+      | AND (left, right) -> env,
+        and_operator env left right
 
       (*Unary operators*)
       | NOT (expr) ->env, unary_operator env expr fn_not
@@ -200,6 +206,40 @@ let eval (t:ast) =
       | EvaluationError msg -> EvaluationError msg
       | Nil -> EvaluationError "expected value, got none"
       | Value vv -> op_fn vv
+
+  and or_operator env left right =
+    let env, v = eval_env left env in
+    match v with
+    | EvaluationError msg -> EvaluationError msg
+    | Nil -> EvaluationError "expected value, got none"
+    | Value (Boolean_t true) -> v
+    | Value (Boolean_t false) ->
+      (
+      let _, v_right = eval_env right env in
+      match v_right with
+      | EvaluationError msg -> EvaluationError msg
+      | Nil -> EvaluationError "expected value, got none"
+      | Value (Boolean_t x) -> v_right
+      | Value t ->EvaluationError ("Expected expression of type bool, got " ^ show_type_type t)
+      )
+    | Value t -> EvaluationError ("Expected expression of type bool, got " ^ show_type_type t)
+
+  and and_operator env left right =
+    let env, v = eval_env left env in
+    match v with
+    | EvaluationError msg -> EvaluationError msg
+    | Nil -> EvaluationError "expected value, got none"
+    | Value (Boolean_t false) -> v
+    | Value (Boolean_t true) ->
+      (
+      let _, v_right = eval_env right env in
+      match v_right with
+      | EvaluationError msg -> EvaluationError msg
+      | Nil -> EvaluationError "expected value, got none"
+      | Value (Boolean_t x) -> v_right
+      | Value t ->EvaluationError ("Expected expression of type bool, got " ^ show_type_type t)
+      )
+    | Value t -> EvaluationError ("Expected expression of type bool, got " ^ show_type_type t)
 
   and var_mut_operator env (name:string) (t:ast) =
     let env_, v = eval_env t env in
