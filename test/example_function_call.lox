@@ -1,0 +1,2 @@
+fibonacci(a,b,c,d);
+fibonacci(a)(b,c)(d);

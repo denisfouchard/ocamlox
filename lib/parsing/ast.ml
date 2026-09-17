@@ -1,50 +1,4 @@
-(* LOWEST TO HIGHEST
-Name	        Operators	    Associates
----------------------------------------
-Equality	    == !=	        Left
-Comparison	  > >= < <=	    Left
-Term	        - +	          Left
-Factor	      / *	          Left
-Unary	        ! -	          Right
 
-
-program        → declaration* EOF ;
-
-declaration    → varDecl
-               | statement ;
-
-statement      → exprStmt
-              | ifStmt
-              | whileStmt
-              | forStmt
-              | printStmt
-              | block ;
-
-ifStmt         → "if" "(" expression ")" statement
-              ( "else" statement )? ;
-
-whileStmt      -> "while" "(" expression ")" statement
-
-block          → "{" declaration* "}" ;
-
-exprStmt       → expression ";" ;
-printStmt      → "print" expression ";"
-
-expression     → assignment ;
-assignment     → IDENTIFIER "=" assignment
-               | logic_or ;
-logic_or       → logic_and ( "or" logic_and )* ;
-logic_and      → equality ( "and" equality )* ;
-
-equality       → comparison ( ( "!=" of ast * ast | "==" ) comparison )* ;
-comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
-term           → factor ( ( "-" | "+" ) factor )* ;
-factor         → unary ( ( "/" | "*" ) unary )* ;
-unary          → ( "!" | "-" ) unary| primary ;
-primary        → NUMBER | STRING | "true" | "false" | "nil"
-               | "(" expression ")" ;
-
-*)
 open Scanner
 
 
@@ -103,6 +57,8 @@ type ast =
  | VariableDeclaration of {name:string; value:ast}
  | VariableAccess of string
  | VariableMutation of {name:string; value:ast}
+
+ | FunctionCall of {callee:ast; arguments: ast list}
 
  | Block of ast list
 [@@deriving show]

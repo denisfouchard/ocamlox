@@ -35,29 +35,7 @@ let parse_scope tokens =
   and semi_col_token () = {token_type=SEMICOLON; lexeme=";";literal=None;line=0}
   in parse_scope_aux tokens 0
 
-let parse_paren tokens =
-  let rec parse_paren_aux tokens p =
-    match tokens with
-      | [] | {token_type = EOF; _}::_ -> failwith ("Unexpected EOF, missing }")
-      | tok::next when tok.token_type == RIGHT_PAREN ->
-          if p ==0 then
-            (match next with
-              | {token_type = SEMICOLON;_}::nnext -> [], nnext
-              | _-> [], next
-            )
-          else
-            let st, next = (parse_paren_aux next (p-1) ) in
-            tok::st, next
-      | last::right_PAREN::next
-        when last.token_type != SEMICOLON
-        && right_PAREN.token_type == RIGHT_PAREN ->
-        parse_paren_aux (last::(semi_col_token ())::right_PAREN::next) p
-      | tok::next when tok.token_type == LEFT_BRACE ->
-      let st, next = (parse_paren_aux next (p+1)) in tok::st, next
-      | tok::next->
-      let st, next = (parse_paren_aux next p) in tok::st, next
-  and semi_col_token () = {token_type=SEMICOLON; lexeme=";";literal=None;line=0}
-  in parse_paren_aux tokens 0
+
 
 
 let rec parse_program tokens =
@@ -163,7 +141,7 @@ and parse_for_statement tokens =
   match tokens with
   | {token_type = LEFT_PAREN; _}::next ->
     (
-    let clauses_tokens, next = parse_paren next in
+    let clauses_tokens, next = parse_paren next true in
     let clauses = parse_declaration_sequence clauses_tokens in
     match clauses with
     | StatementSequence s ->
