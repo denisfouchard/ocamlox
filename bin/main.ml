@@ -1,9 +1,10 @@
 open Arg
 open Format
 open Ocamlox.Scanner
-open Ocamlox.Utils
 open Ocamlox.Eval
-open Ocamlox.Parser
+open Ocamlox.Parsing.Main
+open Ocamlox.Eval.Result
+open Ocamlox.Eval.Main
 let usage_msg = "ocamlox [<file>] [--expression <expr>]"
 
 
@@ -25,7 +26,7 @@ let run_source (source : string) =
   let result = scan_source ctx in
   let token_list = List.rev result.tokens in
     (*token_list |> List.iter print_token;*)
-    let t = parse_program token_list in
+    let t = parse token_list in
     print_endline (show_result (eval t))
     (*print_endline (show_ast t)*)
     (*print_endline (show_tok_l token_list)*)

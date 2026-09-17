@@ -1,11 +1,6 @@
 module VarTable = Map.Make(String);;
+open Result
 
-type type_t =
-  | Boolean_t of bool
-  | Float_t of float
-  | String_t of string
-  | NoneValue
-[@@deriving show]
 
 let show_type_type t =
   match t with
