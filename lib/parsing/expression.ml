@@ -125,12 +125,15 @@ and parse_call tokens =
       (
       let arg_tokens, next = parse_paren next false in
       let args = parse_args arg_tokens in
+        if List.length args > 255
+        then failwith ("[ParsingError] Too many args (max 255")
+        else
         FunctionCall {callee=acc;arguments=args}, next
       )
     | _ -> acc, next
 and parse_primary tokens =
   match tokens with
-    | [] -> failwith "Unexpected end of input"
+    | [] -> EMPTY, []
     | { token_type = LEFT_PAREN; _ } :: next ->
         let expr, next = parse_expression next in
         (match next with
@@ -163,7 +166,7 @@ and parse_args tokens =
   | [] -> (if arg == EMPTY then [] else [arg])
   | { token_type = COMMA; _}::next_args ->
     arg::(parse_args next_args)
-|_ -> print_endline ("Next tokens : " ^show_tok_l next); failwith("[ParsingError: Uncorrectly formated args")
+  |_ -> print_endline ("Next tokens : " ^show_tok_l next); failwith("[ParsingError: Uncorrectly formated args")
 
 
 

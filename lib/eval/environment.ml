@@ -2,12 +2,13 @@ module VarTable = Map.Make(String);;
 open Result
 
 
-let show_type_type t =
+let rec show_type_type t =
   match t with
   | Boolean_t _ -> "bool"
   | Float_t _ -> "float"
   | String_t _ -> "string"
   | NoneValue -> "none"
+  | Callable f -> "fun"
 
 module Environment = struct
 

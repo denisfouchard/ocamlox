@@ -59,7 +59,7 @@ type ast =
  | VariableMutation of {name:string; value:ast}
 
  | FunctionCall of {callee:ast; arguments: ast list}
-
+ | FunctionDeclaration of {name:string; arguments: ast list; body:ast}
  | Block of ast list
 [@@deriving show]
 

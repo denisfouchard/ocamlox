@@ -3,6 +3,7 @@ open Environment
 open Result
 open Parsing.Ast
 open Operators
+open Functions
 
 (**Main Eval**)
 let eval (t:ast) =
@@ -100,7 +101,15 @@ let eval (t:ast) =
           in (Environment.delete_local_scope local_env), res
 
 
-
+      | FunctionCall ({callee=fn_expr;arguments=args}) ->
+          eval_function_call fn_expr args env
+      | FunctionDeclaration (
+            {
+              name=fn_name;
+              arguments=args;
+              body=body_t
+            }
+          ) -> eval_function_declaration fn_name args body_t env
       (**Not implemented**)
       | _ ->env, EvaluationError ("Not implemented : " ^ show_ast t)
 
@@ -237,5 +246,37 @@ let eval (t:ast) =
     ) in
     eval_while_statement loop_condition loop_incr var_init_env
 
+  and eval_function_call fn_expr args_expr_l env =
+    let env, fn = eval_env fn_expr env in
+    match fn with
+    | Value (Callable f) ->
+      let env, args_t = eval_args args_expr_l env in
+      let fn_body = f.body in
+      let function_scope = Environment.create_local_scope env in
+      let function_scope, res = bind_args f.args args_t function_scope in
+      (
+      match res with
+      | EvaluationError msg -> env, EvaluationError msg
+      | Nil ->
+        let function_scope, call_res = eval_env fn_body function_scope in
+        (Environment.delete_local_scope function_scope), call_res
+      |_ -> env, EvaluationError "Compilor error"
+      )
+    |Value z -> env, EvaluationError ("Error : "^ (show_type_t z) ^ "not callable")
+
+    | Nil -> env, EvaluationError ("Error: Nil value not callable")
+    | EvaluationError msg -> env, fn
+
+      and eval_args (l: ast list) env =
+    match l with
+    |[]-> env, []
+    |arg_expr::next ->
+      let env, arg=  eval_env arg_expr env in
+      let env_, next_args = (eval_args next env) in
+      env_, arg::next_args
+
+  and eval_function_declaration fn_name args body_t env =
+    let fn_var = Callable({args=args;body=body_t}) in
+    Environment.define env fn_name fn_var, Nil
 
   in let _, res = eval_env t (Environment.empty) in res

@@ -8,6 +8,7 @@ let to_str (a:result) =
       | Boolean_t b -> if b then "True" else "False"
       | Float_t x -> string_of_float x
       | NoneValue -> "None"
+      | Callable _ -> "fun"
     )
     | EvaluationError s -> s
     | Nil -> "Nil"
@@ -15,16 +16,13 @@ let to_str (a:result) =
 let fn_not (b: type_t) =
   match b with
     | Boolean_t bb -> Value (Boolean_t (not bb))
-    | NoneValue -> EvaluationError ("Wrong type, expected Bool, got None")
-    | Float_t _ -> EvaluationError ("Wrong type, expected Bool, got Float")
-    | String_t _ -> EvaluationError ("Wrong type, expected Bool, got String")
+    | _ -> EvaluationError ("Wrong type, expected Bool, got "^ (show_type_t b))
+
 
 let fn_neg (b: type_t) =
   match b with
-    | NoneValue -> EvaluationError ("Wrong type, expected Float, got None")
-    | Boolean_t bb -> EvaluationError ("Wrong type, expected Float, got Bool")
     | Float_t x -> Value (Float_t (-.x))
-    | String_t _ -> EvaluationError ("Wrong type, expected Float, got String")
+    |  _ -> EvaluationError ("Wrong type, expected Float, got "^ (show_type_t b))
 
 let fn_add (a:type_t) (b:type_t) =
   match a, b with

@@ -54,17 +54,25 @@ and parse_declaration tokens =
   match tokens with
     (*Simple Statements/declarations*)
     | [] -> EMPTY, []
+    | { token_type = EOF; _}::_ -> EMPTY, []
+
+    (*variables*)
     | { token_type = VAR; _}::var_decl ->
       let statement_tokens, next = parse_semicol var_decl [] in
       parse_variable_declaration statement_tokens, next
     | { token_type = IDENTIFIER; _}::{ token_type = EQUAL; _}::_ ->
       let statement_tokens, next = parse_semicol tokens [] in
       parse_variable_mutation statement_tokens, next
-    | { token_type = EOF; _}::_ -> EMPTY, []
+
+    (**Functions**)
     | { token_type = PRINT; _}::q ->
       let statement_tokens, next = parse_semicol q [] in
       let expr, _ = parse_expression statement_tokens in
       (PrintStatement expr), next
+    | { token_type = FUN; _}::fun_tokens ->
+      parse_function_declaration fun_tokens
+
+    (*Control Flow*)
     | { token_type = IF; _}::_->
       parse_if_statement tokens
     | { token_type = WHILE; _}::_->
@@ -164,3 +172,30 @@ and parse_for_statement tokens =
     |_ -> failwith "Incorrect for loop clauses"
     )
   | _-> failwith "[For loop error] Expected clauses between parentheses"
+
+and parse_function_declaration tokens =
+  match tokens with
+  | tok::par::next ->
+      if tok.token_type != IDENTIFIER
+      then failwith "Expected function name"
+      else (
+        if par.token_type != LEFT_PAREN then failwith "Incorrect function declaration syntax"
+        else
+        let fn_name = tok.lexeme in
+        let arg_tokens, next = parse_paren next false in
+        let args = parse_args arg_tokens in
+        let body_t, next = parse_declaration next in
+        (
+          match body_t with
+          | Block l ->
+            FunctionDeclaration (
+              {
+                name=fn_name;
+                arguments=args;
+                body=body_t
+              }
+            ), next
+          | _ -> failwith "Incorrect function body"
+        )
+      )
+      | _-> failwith "Incorrect function declaration syntax"
