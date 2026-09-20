@@ -19,12 +19,39 @@ fun fibo2(n){
     var a = 0;
     var b = 1;
     for (var i =0; i<n; i=i+1) {
-        if (b > 12){
-            return b
-        }
         b = a + b;
         a = b - a
     }
-    print b;
+    return b;
 }
+
+fun inplace_fibo(n, t){
+    var a = 0;
+    var b = 1;
+    for (var i =0; i<n; i=i+1) {
+        b = a + b;
+        a = b - a
+    }
+    t = b;
+}
+
+fun fibo3(n){
+    var a = 0;
+    var b = 1;
+    fun update(x,y){
+        y= y+x
+        x= y-x
+    }
+    for (var i =0; i<n; i=i+1) {
+        update(a,b)
+    }
+    return b;
+}
+
 var d = fibo2(15);
+var t = 0;
+inplace_fibo(15, t);
+print t;
+print t;
+print t;
+//var dd = fibo3(15);
