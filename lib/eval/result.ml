@@ -11,4 +11,5 @@ type result =
   | EvaluationError of string
   | Value of type_t
   | Nil
+  | Return of type_t
 [@@deriving show]

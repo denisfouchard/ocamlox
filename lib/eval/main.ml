@@ -58,6 +58,7 @@ let eval (t:ast) =
           |expr::q -> let env, res = eval_env expr env in
             match res with
             | EvaluationError msg -> env, res (* If error is caught, early stopping*)
+            | Return t -> env, Return t
             |_->eval_env (StatementSequence q) env
         )
 
@@ -75,12 +76,13 @@ let eval (t:ast) =
 
       | Block l ->
         let local_env = (Environment.create_local_scope env) in
+        let local_env, res=
         (match l with
-          |[] -> (Environment.delete_local_scope local_env), Nil
+          |[] -> local_env, Nil
           |expr::q ->
-            let local_env', res = eval_env expr local_env in
-              eval_env (StatementSequence q) local_env'
+              eval_env (StatementSequence l) local_env
         )
+        in (Environment.delete_local_scope local_env), res
 
       | IfStatement ({condition=c; then_branch=tb; else_branch=eb}) ->
           eval_if_statement c tb eb env
@@ -110,7 +112,16 @@ let eval (t:ast) =
               body=body_t
             }
           ) -> eval_function_declaration fn_name args body_t env
-      | ReturnStatement x -> eval_env x env
+      | ReturnStatement x ->
+        let env, res = eval_env x env in
+        let ret = (
+          match res with
+          | EvaluationError msg -> EvaluationError msg
+          | Nil -> Return NoneValue
+          | Value x -> Return x
+          | Return x -> Return x
+        ) in
+        env, ret
       (**Not implemented**)
       | _ ->env, EvaluationError ("Not implemented : " ^ show_ast t)
 
@@ -119,13 +130,16 @@ let eval (t:ast) =
     match left_v with
       |EvaluationError msg -> EvaluationError msg
       |Nil -> EvaluationError "expected value, got none"
+      | Return _ -> EvaluationError "Unexpected return statement"
       |Value left_vv ->
         let _, right_v = eval_env right_t env in
         (match right_v with
-          |EvaluationError msg -> EvaluationError msg
-          |Nil -> EvaluationError "expected value, got none"
-          |Value right_vv -> op_fn left_vv right_vv
+          | EvaluationError msg -> EvaluationError msg
+          | Nil -> EvaluationError "expected value, got none"
+          | Value right_vv -> op_fn left_vv right_vv
+          | Return _ -> EvaluationError "Unexpected return statement"
         )
+
 
   and unary_operator env t op_fn =
     let _, v = eval_env t env in
@@ -133,6 +147,7 @@ let eval (t:ast) =
       | EvaluationError msg -> EvaluationError msg
       | Nil -> EvaluationError "expected value, got none"
       | Value vv -> op_fn vv
+      | Return _ -> EvaluationError "Unexpected return statement"
 
   and or_operator env left right =
     let env, v = eval_env left env in
@@ -140,11 +155,13 @@ let eval (t:ast) =
     | EvaluationError msg -> EvaluationError msg
     | Nil -> EvaluationError "expected value, got none"
     | Value (Boolean_t true) -> v
+    | Return _ -> EvaluationError "Unexpected return statement"
     | Value (Boolean_t false) ->
       (
       let _, v_right = eval_env right env in
       match v_right with
       | EvaluationError msg -> EvaluationError msg
+      | Return _ -> EvaluationError "Unexpected return statement"
       | Nil -> EvaluationError "expected value, got none"
       | Value (Boolean_t x) -> v_right
       | Value t ->EvaluationError ("Expected expression of type bool, got " ^ show_type_type t)
@@ -155,6 +172,7 @@ let eval (t:ast) =
     let env, v = eval_env left env in
     match v with
     | EvaluationError msg -> EvaluationError msg
+    | Return _ -> EvaluationError "Unexpected return statement"
     | Nil -> EvaluationError "expected value, got none"
     | Value (Boolean_t false) -> v
     | Value (Boolean_t true) ->
@@ -162,6 +180,7 @@ let eval (t:ast) =
       let _, v_right = eval_env right env in
       match v_right with
       | EvaluationError msg -> EvaluationError msg
+      | Return _ -> EvaluationError "Unexpected return statement"
       | Nil -> EvaluationError "expected value, got none"
       | Value (Boolean_t x) -> v_right
       | Value t ->EvaluationError ("Expected expression of type bool, got " ^ show_type_type t)
@@ -169,17 +188,22 @@ let eval (t:ast) =
     | Value t -> EvaluationError ("Expected expression of type bool, got " ^ show_type_type t)
 
   and var_mut_operator env (name:string) (t:ast) =
-    let env_, v = eval_env t env in
+    let env, v = eval_env t env in
+    (
     match v with
       | EvaluationError msg ->  env, (EvaluationError msg)
-      | Nil->env, EvaluationError "can not define a variable with no value"
-      | Value vv->
-        print_endline ("Var(" ^ name ^ ") <- " ^ (to_str v));
-        let new_env = Environment.mutate env_ name vv in
-        (match new_env with
-          |None -> env, EvaluationError ("UnboundValueError: " ^ name ^ " is not defined.")
-          |Some new_env' -> new_env', Nil
-        )
+      | Nil-> env, EvaluationError "can not define a variable with no value"
+      | Value vv-> mutf env name vv
+      | Return vv -> mutf env name vv
+    )
+
+  and mutf env name v =
+    (*print_endline ("Var(" ^ name ^ ") <- " ^ (to_str (Value val)));*)
+    let new_env = Environment.mutate env name v in
+    (match new_env with
+      |None -> env, EvaluationError ("UnboundValueError: " ^ name ^ " is not defined.")
+      |Some new_env' -> new_env', Nil
+    )
 
   and var_decl_operator env (name:string) (t:ast) =
     let env_, v = eval_env t env in
@@ -189,11 +213,13 @@ let eval (t:ast) =
       | Value vv->
         print_endline ("Var(" ^ name ^ ") = " ^ (to_str v));
         (Environment.define env_ name vv), Nil
+      | Return vv ->
+        print_endline ("Var(" ^ name ^ ") = " ^ (to_str v));
+        (Environment.define env_ name vv), Nil
 
 
   and eval_if_statement (condition:ast) (then_branch:ast) (else_branch:ast option) env =
     let env, condition_res = eval_env condition env in
-    print_endline (show_result condition_res);
     let condition_res =
       (
       match condition_res with
@@ -203,6 +229,7 @@ let eval (t:ast) =
     in
     match condition_res with
     | EvaluationError msg -> env, condition_res
+    | Return _ -> env, EvaluationError "Unexpected return statement"
     | Nil -> env, EvaluationError ("Error: expected value inside conditional if, got Nil")
     | Value (Boolean_t b) ->
       if b then (eval_env then_branch env)
@@ -217,7 +244,6 @@ let eval (t:ast) =
 
   and eval_while_statement (condition:ast) (loop:ast)  env =
     let env, condition_res = eval_env condition env in
-    print_endline (show_result condition_res);
     let condition_res =
       (
       match condition_res with
@@ -227,11 +253,16 @@ let eval (t:ast) =
     in
     match condition_res with
     | EvaluationError msg -> env, condition_res
+    | Return _ -> env, EvaluationError "Unexpected return statement"
     | Nil -> env, EvaluationError ("Error: expected value inside conditional while, got Nil")
     | Value (Boolean_t b) ->
       if b then
-        let env, _ = (eval_env loop env)
-        in eval_while_statement condition loop env
+        let env, res = (eval_env loop env) in
+        (
+        match res with
+        | Return x -> env, res
+        |_-> eval_while_statement condition loop env
+        )
         else env, Nil
 
 
@@ -250,6 +281,9 @@ let eval (t:ast) =
   and eval_function_call fn_expr args_expr_l env =
     let env, fn = eval_env fn_expr env in
     match fn with
+    | Nil -> env, EvaluationError ("Error: Nil value not callable")
+    | EvaluationError msg -> env, fn
+    | Return _ -> env, EvaluationError "Unexpected return statement"
     | Value (Callable f) ->
       let env, args_t = eval_args args_expr_l env in
       let fn_body = f.body in
@@ -265,10 +299,9 @@ let eval (t:ast) =
       )
     |Value z -> env, EvaluationError ("Error : "^ (show_type_t z) ^ "not callable")
 
-    | Nil -> env, EvaluationError ("Error: Nil value not callable")
-    | EvaluationError msg -> env, fn
 
-      and eval_args (l: ast list) env =
+
+  and eval_args (l: ast list) env =
     match l with
     |[]-> env, []
     |arg_expr::next ->

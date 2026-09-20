@@ -1,6 +1,6 @@
 open Result
 
-let to_str (a:result) =
+let rec to_str (a:result) =
   match a with
     | Value aa ->
     (match aa with
@@ -12,6 +12,7 @@ let to_str (a:result) =
     )
     | EvaluationError s -> s
     | Nil -> "Nil"
+    | Return t -> to_str (Value t)
 
 let fn_not (b: type_t) =
   match b with
