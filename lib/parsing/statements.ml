@@ -72,6 +72,8 @@ and parse_declaration tokens =
     | { token_type = FUN; _}::fun_tokens ->
       parse_function_declaration fun_tokens
 
+    | { token_type = RETURN; _}::next -> parse_return next
+
     (*Control Flow*)
     | { token_type = IF; _}::_->
       parse_if_statement tokens
@@ -199,3 +201,10 @@ and parse_function_declaration tokens =
         )
       )
       | _-> failwith "Incorrect function declaration syntax"
+
+and parse_return tokens =
+  let acc, next = parse_expression tokens in
+  match next with
+  | {token_type=SEMICOLON;_}::nnext ->
+    (ReturnStatement acc), nnext
+  |_ -> (ReturnStatement acc), next

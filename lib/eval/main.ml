@@ -110,6 +110,7 @@ let eval (t:ast) =
               body=body_t
             }
           ) -> eval_function_declaration fn_name args body_t env
+      | ReturnStatement x -> eval_env x env
       (**Not implemented**)
       | _ ->env, EvaluationError ("Not implemented : " ^ show_ast t)
 

@@ -104,7 +104,12 @@ let add_token_aux token_type lexeme literal line ctx =
     token_type; lexeme; literal; line;
   } :: ctx.tokens in
 
-  {source=ctx.source;start=ctx.current+1; current=ctx.current;line=ctx.line;tokens=new_tokens}
+  {source=ctx.source;
+    start=ctx.current+1;
+    current=ctx.current;
+    line=ctx.line;
+    tokens=new_tokens
+  }
 
 let current_line (ctx:scanner_ctx) : string =
   string_of_int (ctx.line)
@@ -166,7 +171,10 @@ let scan_string (ctx:scanner_ctx) =
   let rec scan_string_acc ctx acc =
     let c = current_char ctx in
     match c with
-    | None | Some '\n'-> failwith ("[scanner.ml] Incorrect formated string at line" ^ (current_line ctx) ^". Expected end of string")
+    | None | Some '\n'->
+      failwith ("[scanner.ml] Incorrect formated string at line"
+        ^ (current_line ctx)
+        ^". Expected end of string")
     | Some char ->
       if char == '"'
           then
@@ -180,10 +188,12 @@ let scan_identifier (ctx:scanner_ctx)=
   let rec scan_ident_acc acc ctx =
     let c = current_char ctx in
     (match c with
-    | Some chx when is_alphanumeric chx -> (scan_ident_acc (acc ^(String.make 1 chx)) (advance ctx) )
+    | Some chx when is_alphanumeric chx ->
+      (scan_ident_acc (acc ^(String.make 1 chx)) (advance ctx) )
     | _ -> let ctx_ = rollback ctx in (
         match (Keywords.get_identifier acc) with
-        | IDENTIFIER ->(add_token IDENTIFIER (Some (STRING_LITERAL acc)) ctx_)
+        | IDENTIFIER ->
+          (add_token IDENTIFIER (Some (STRING_LITERAL acc)) ctx_)
         | tok_type ->(add_token tok_type None ctx_)
     ))
       in scan_ident_acc "" ctx
@@ -193,27 +203,41 @@ let parse_float partie_entiere decimale =
   let rec list_to_float l=
     match l with
     | [] -> 0.
-    |h::t -> (float_of_int h) *. (10.** (float_of_int (List.length t))) +. (list_to_float t)
+    | h::t ->
+      (float_of_int h)
+      *. (10.** (float_of_int (List.length t)))
+      +. (list_to_float t)
   in let pe_float = (list_to_float partie_entiere) in
-  let dec_float = ((list_to_float decimale) *. (10.**float_of_int (-List.length decimale)))
+  let dec_float =
+    ((list_to_float decimale)
+      *. (10.**float_of_int (-List.length decimale)))
   in pe_float +. dec_float
 
 
 let scan_numerical (ctx:scanner_ctx) =
-  let rec scan_num_acc (partie_entiere: int list) (decimale:int list) (flag:bool) (ctx:scanner_ctx)=
+  let rec scan_num_acc
+    (partie_entiere: int list)
+    (decimale:int list)
+    (flag:bool)
+    (ctx:scanner_ctx)=
     let c = current_char ctx in
     match c with
     | None | Some '\n'-> (partie_entiere, decimale, ctx)
     | Some char -> let new_int = parse_int char in
-                if  new_int < 0 && char != '.'
-                    then (partie_entiere, decimale, ctx) else
-                      if char == '.' then
-                        let partie_entiere_, decimale_, ctx2 = (scan_num_acc partie_entiere decimale true (advance ctx))
-                        in (partie_entiere, decimale_, ctx2)
-                      else
-                        let partie_entiere_, decimale_, ctx2 = (scan_num_acc partie_entiere decimale flag (advance ctx))
-                        in if flag then (partie_entiere_, new_int::decimale_, ctx2)
-                        else (new_int::partie_entiere_, decimale_, ctx2)
+      if  new_int < 0 && char != '.'
+      then (partie_entiere, decimale, ctx)
+      else
+        if char == '.' then
+          let partie_entiere_, decimale_, ctx2 =
+            (scan_num_acc partie_entiere decimale true (advance ctx))
+          in (partie_entiere, decimale_, ctx2)
+        else
+          let partie_entiere_, decimale_, ctx2 =
+            (scan_num_acc partie_entiere decimale flag (advance ctx))
+          in
+          if flag
+          then (partie_entiere_, new_int::decimale_, ctx2)
+          else (new_int::partie_entiere_, decimale_, ctx2)
 
     in let pe, dec, ctx_ = (scan_num_acc [] [] false ctx) in
 
@@ -256,36 +280,48 @@ let scan_token (ctx:scanner_ctx) =
             |';'-> add_token SEMICOLON None ctx_
             |'*'-> add_token STAR None ctx_
             (* Double char operators *)
-            |'!'-> if is_next '=' ctx_
-                    then scan_second_token BANG ctx_
-                    else add_token BANG None ctx_
-            |'>' -> if is_next '=' ctx_
-                      then scan_second_token GREATER ctx_
-                      else add_token GREATER None ctx_
-            |'<' ->  if is_next '=' ctx_
-                      then scan_second_token LESS ctx_
-                      else add_token LESS None ctx_
-            |'=' -> if is_next '=' ctx_ then scan_second_token EQUAL ctx_ else
+            |'!'->
+              if is_next '=' ctx_
+              then scan_second_token BANG ctx_
+              else add_token BANG None ctx_
+            |'>' ->
+              if is_next '=' ctx_
+              then scan_second_token GREATER ctx_
+              else add_token GREATER None ctx_
+            |'<' ->
+              if is_next '=' ctx_
+              then scan_second_token LESS ctx_
+              else add_token LESS None ctx_
+            |'=' ->
+              if is_next '=' ctx_
+              then scan_second_token EQUAL ctx_
+              else
                 (match acc with
-                      | BANG -> add_token BANG_EQUAL None ctx_
-                      | GREATER -> add_token GREATER_EQUAL None ctx_
-                      | LESS -> add_token LESS_EQUAL None ctx_
-                      | BOF -> add_token EQUAL None ctx_
-                      | EQUAL -> add_token EQUAL_EQUAL None ctx_
-                      | _ when is_next '=' ctx_ -> scan_second_token EQUAL ctx_
-                      | _ -> add_token EQUAL None (add_token acc None ctx_))
+                  | BANG -> add_token BANG_EQUAL None ctx_
+                  | GREATER -> add_token GREATER_EQUAL None ctx_
+                  | LESS -> add_token LESS_EQUAL None ctx_
+                  | BOF -> add_token EQUAL None ctx_
+                  | EQUAL -> add_token EQUAL_EQUAL None ctx_
+                  | _ when is_next '=' ctx_ -> scan_second_token EQUAL ctx_
+                  | _ -> add_token EQUAL None (add_token acc None ctx_)
+                )
             (* Case of // for comment *)
             |'/' -> if is_next '/' ctx_ then scan_second_token SLASH ctx_ else
               (match acc with
-                      (*Comment*)
-                      | SLASH -> (skip_line ctx_)
-                      | BOF -> add_token SLASH None ctx_
-                      |_ when is_next '/' ctx_ -> scan_second_token SLASH ctx_
-                      |_ -> add_token SLASH None (add_token acc None ctx_))
+                (*Comment*)
+                | SLASH -> (skip_line ctx_)
+                | BOF -> add_token SLASH None ctx_
+                |_ when is_next '/' ctx_ -> scan_second_token SLASH ctx_
+                |_ -> add_token SLASH None (add_token acc None ctx_)
+              )
             |'"' -> scan_string (advance ctx_)
             | _ when parse_int c >= 0 -> scan_numerical  ctx_
             | _ when is_alpha c -> scan_identifier ctx_
-            | _ -> failwith ("[scanner.ml] Unknown character " ^ (String.make 1 c) ^ " at line " ^ current_line ctx_ ^ ":" ^ string_of_int ctx_.current)
+            | _ -> failwith ("[scanner.ml] Unknown character "
+              ^ (String.make 1 c)
+              ^ " at line "
+              ^ current_line ctx_
+              ^ ":" ^ string_of_int ctx_.current)
     in scan_second_token BOF ctx
 
 

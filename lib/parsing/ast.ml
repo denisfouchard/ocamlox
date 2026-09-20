@@ -54,6 +54,8 @@ type ast =
                     loop:ast
                   }
 
+ | ReturnStatement of ast
+
  | VariableDeclaration of {name:string; value:ast}
  | VariableAccess of string
  | VariableMutation of {name:string; value:ast}
