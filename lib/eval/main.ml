@@ -271,6 +271,7 @@ let eval (t:ast) =
         (
         match res with
         | Return x -> env, res
+        | EvaluationError msg -> env, res
         |_-> eval_while_statement condition loop env
         )
         else env, Nil
