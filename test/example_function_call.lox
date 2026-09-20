@@ -64,13 +64,9 @@ fun fibo3(n){
 //var dd = fibo3(15);
 
 fun fib(n) {
-  if (n <= 1)
-    {return n;}
-  else
-  {
-    print fib(n-1);
+  if (n <= 1) return n;
     return fib(n - 2) + fib(n - 1)
-    }
+
 }
 
 print fib(15);

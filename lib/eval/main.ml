@@ -128,12 +128,12 @@ let eval (t:ast) =
     let _, left_v = eval_env left_t env  in
     match left_v with
       |EvaluationError msg -> EvaluationError msg
-      |Nil -> EvaluationError "expected value, got none"
+      |Nil -> EvaluationError "BinOpLeft : expected value, got none"
       |Return left_vv ->
         let _, right_v = eval_env right_t env in
         (match right_v with
           | EvaluationError msg -> EvaluationError msg
-          | Nil -> EvaluationError "expected value, got none"
+          | Nil -> EvaluationError "BinOpRight : expected value, got none"
           | Value right_vv -> op_fn left_vv right_vv
           | Return right_vv -> op_fn left_vv right_vv
         )
@@ -141,7 +141,7 @@ let eval (t:ast) =
         let _, right_v = eval_env right_t env in
         (match right_v with
           | EvaluationError msg -> EvaluationError msg
-          | Nil -> EvaluationError "expected value, got none"
+          | Nil -> EvaluationError "BinOpRight : expected value, got none"
           | Value right_vv -> op_fn left_vv right_vv
           | Return right_vv -> op_fn left_vv right_vv
         )
@@ -151,7 +151,7 @@ let eval (t:ast) =
     let _, v = eval_env t env in
     match v with
       | EvaluationError msg -> EvaluationError msg
-      | Nil -> EvaluationError "expected value, got none"
+      | Nil -> op_fn NoneValue
       | Value vv -> op_fn vv
       | Return vv -> op_fn vv
 
@@ -159,7 +159,7 @@ let eval (t:ast) =
     let env, v = eval_env left env in
     match v with
     | EvaluationError msg -> EvaluationError msg
-    | Nil -> EvaluationError "expected value, got none"
+    | Nil -> EvaluationError "OrOpLeft:expected value, got none"
     | Value (Boolean_t true) -> v
     | Return _ -> EvaluationError "OrOpLeft:Unexpected return statement"
     | Value (Boolean_t false) ->
@@ -168,7 +168,7 @@ let eval (t:ast) =
       match v_right with
       | EvaluationError msg -> EvaluationError msg
       | Return _ -> EvaluationError "OrOpRight:Unexpected return statement"
-      | Nil -> EvaluationError "expected value, got none"
+      | Nil -> EvaluationError "OrOpRight:expected value, got none"
       | Value (Boolean_t x) -> v_right
       | Value t ->EvaluationError ("Expected expression of type bool, got "
         ^ show_type_type t)
